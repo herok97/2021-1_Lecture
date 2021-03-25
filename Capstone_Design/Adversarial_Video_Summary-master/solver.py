@@ -9,7 +9,7 @@ import json
 from tqdm import tqdm, trange
 
 from layers import Summarizer, Discriminator  # , apply_weight_norm
-from utils import TensorboardWriter
+# from utils import TensorboardWriter
 # from feature_extraction import ResNetFeature
 
 
@@ -61,8 +61,8 @@ class Solver(object):
             # for name, param in self.model.named_parameters():
             #     print('\t' + name + '\t', list(param.size()))
 
-            # Tensorboard
-            self.writer = TensorboardWriter(self.config.log_dir)
+            # Tensorboard 주석처리 내가 했음
+            # self.writer = TensorboardWriter(self.config.log_dir)
 
     @staticmethod
     def freeze_model(module):
@@ -100,6 +100,9 @@ class Solver(object):
             for batch_i, image_features in enumerate(tqdm(
                     self.train_loader, desc='Batch', ncols=80, leave=False)):
 
+                image_features = image_features[0]
+                print("image_features.shape", image_features.shape)
+                print("image_features.size(1)", image_features.size(1))
                 if image_features.size(1) > 10000:
                     continue
 
@@ -109,6 +112,9 @@ class Solver(object):
 
                 # [seq_len, 2048]
                 image_features_ = Variable(image_features).cuda()
+
+                # 내가 작성한 코드
+                del image_features
 
                 #---- Train sLSTM, eLSTM ----#
                 if self.config.verbose:

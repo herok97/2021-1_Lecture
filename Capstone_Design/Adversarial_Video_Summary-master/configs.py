@@ -5,10 +5,16 @@ from pathlib import Path
 import pprint
 
 project_dir = Path(__file__).resolve().parent
-dataset_dir = Path('/data1/jysung710/tmp_sum/360video/').resolve()
-video_list = ['360airballoon', '360parade', '360rowing', '360scuba', '360wedding']
-save_dir = Path('/data1/jmcho/SUM_GAN/')
-score_dir = Path('/data1/common_datasets/tmp_sum/360video/results/SUM-GAN/')
+dataset_dir = Path('C:/Users/01079/video_summarization_data/only_video/').resolve()
+video_list = ['OVP', 'SumMe', 'TvSum']
+save_dir = Path('./results/save/')
+score_dir = Path('./results/score/')
+
+# project_dir = Path(__file__).resolve().parent
+# dataset_dir = Path('/data1/jysung710/tmp_sum/360video/').resolve()
+# video_list = ['360airballoon', '360parade', '360rowing', '360scuba', '360wedding']
+# save_dir = Path('/data1/jmcho/SUM_GAN/')
+# score_dir = Path('/data1/common_datasets/tmp_sum/360video/results/SUM-GAN/')
 
 
 def str2bool(v):
@@ -29,11 +35,14 @@ class Config(object):
 
         self.set_dataset_dir(self.video_type)
 
-    def set_dataset_dir(self, video_type='360airballon'):
+    # def set_dataset_dir(self, video_type='360airballon'):
+    def set_dataset_dir(self, video_type='OVP'):
         if self.preprocessed:
-            self.video_root_dir = dataset_dir.joinpath('resnet101_feature', video_type, self.mode)
+            # self.video_root_dir = dataset_dir.joinpath('resnet101_feature', video_type, self.mode)
+            self.video_root_dir = dataset_dir.joinpath(video_type, self.mode)
         else:
-            self.video_root_dir = dataset_dir.joinpath('video_subshot', video_type, 'test')
+            # self.video_root_dir = dataset_dir.joinpath('video_subshot', video_type, 'test')
+            self.video_root_dir = dataset_dir.joinpath(video_type, self.mode)
         self.save_dir = save_dir.joinpath(video_type)
         self.log_dir = self.save_dir
         self.ckpt_path = self.save_dir.joinpath(f'epoch-{self.epoch}.pkl')
@@ -59,7 +68,7 @@ def get_config(parse=True, **optional_kwargs):
     parser.add_argument('--mode', type=str, default='train')
     parser.add_argument('--verbose', type=str2bool, default='true')
     parser.add_argument('--preprocessed', type=str2bool, default='True')
-    parser.add_argument('--video_type', type=str, default='360airballoon')
+    parser.add_argument('--video_type', type=str, default='OVP')
 
     # Model
     parser.add_argument('--input_size', type=int, default=2048)

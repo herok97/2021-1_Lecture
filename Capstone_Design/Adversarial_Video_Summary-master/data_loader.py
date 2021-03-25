@@ -11,12 +11,12 @@ import numpy as np
 
 
 class VideoData(Dataset):
-    def __init__(self, root, preprocessed=True, transform=resnet_transform, with_name=False):
+    def __init__(self, root, preprocessed=False, transform=resnet_transform, with_name=False):
         self.root = root
         self.preprocessed = preprocessed
         self.transform = transform
         self.with_name = with_name
-        self.video_list = list(self.root.iterdir())
+        self.video_list = list(self.root.iterdir()) # iterdir(): 대상 디렉터리를 순회하는 반복자를 반환한다
 
     def __len__(self):
         return len(self.video_list)
@@ -32,12 +32,13 @@ class VideoData(Dataset):
 
         else:
             images = []
+            print("self.video_list[index]", self.video_list[index])
             for img_path in Path(self.video_list[index]).glob('*.jpg'):
                 img = default_loader(img_path)
                 img_tensor = self.transform(img)
                 images.append(img_tensor)
-
-            return torch.stack(images), img_path.parent.name[4:]
+            # return torch.stack(images), img_path.parent.name[4:] # img_path.parent.name[4:] ?
+            return torch.stack(images), img_path.parent.name # img_path.parent.name[4:] ?
 
 
 def get_loader(root, mode):
