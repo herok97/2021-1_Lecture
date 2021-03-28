@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
-
+import h5py
 from PIL import Image
-from torchvision import transforms, models
+from torchvision import transforms, models, datasets
 import torch.nn as nn
-
+import torch
+from tqdm import tqdm
 
 class Rescale(object):
     """Rescale a image to a given size.
@@ -53,9 +54,87 @@ class ResNetFeature(nn.Module):
         pool5 = pool5.view(pool5.size(0), -1)
         return res5c, pool5
 
-
 resnet_transform = transforms.Compose([
-    Rescale(224, 224),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
-])
+        Rescale(224, 224),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+    ])
+
+if __name__ == "__main__":
+    from PIL import Image
+    from torchvision.datasets.folder import default_loader
+
+    model = ResNetFeature()
+    layer = model._modules.get('pool5')
+
+    # GPU 정보
+    USE_CUDA = torch.cuda.is_available()
+    print(USE_CUDA)
+    device = torch.device('cuda:0' if USE_CUDA else 'cpu')
+    print('학습을 진행하는 기기:', device)
+    print('cuda index:', torch.cuda.current_device())
+    print('gpu 개수:', torch.cuda.device_count())
+    print('graphic name:', torch.cuda.get_device_name())
+    cuda = torch.device('cuda')
+    print(cuda)
+
+    def get_vector(image):
+        # Create a PyTorch tensor with the transformed image
+        t_img = resnet_transform(image)
+        # Create a vector of zeros that will hold our feature vector
+        # The 'avgpool' layer has an output size of 512
+        my_embedding = torch.zeros(2048)
+
+        # Define a function that will copy the output of a layer
+        def copy_data(m, i, o):
+            my_embedding.copy_(o.flatten())  # <-- flatten
+
+        # Attach that function to our selected layer
+        h = layer.register_forward_hook(copy_data)
+        # Run the model on our transformed image
+        with torch.no_grad():  # <-- no_grad context
+            model(t_img.cuda().unsqueeze(0))  # <-- unsqueeze
+        # Detach our copy function from the layer
+        h.remove()
+        # Return the feature vector
+        return my_embedding
+
+    import os
+    root_dir = "C:/Users/01079/video_summarization_data/only_video/"
+    save_dir = "C:/Users/01079/video_summarization_data/h5/"
+
+    category = ['OVP', 'SumMe', 'TvSum']
+    tt = ['train', 'test']
+
+    # 어떤 종류의 동영상인지
+    for cate in category:
+        # test 인지 train 인지
+        for t in tt:
+            r_dir = root_dir + '/' + cate + '/' + t + '/'
+            s_dir = save_dir + '/' + cate + '/' + t + '/'
+
+            video_list = os.listdir(r_dir)
+            # 한 영상에 대한 이미지에 대해서
+
+            for video in video_list:
+
+                # 이미지 폴더 접근
+                folder = os.path.join(r_dir, video)
+
+                print('folder:', folder)
+
+                images = []
+                img_names = [os.path.join(folder, name) for name in os.listdir(folder)]
+
+                with tqdm(total=len(img_names)) as progress_bar:
+                    for img_name in img_names:
+                        img = default_loader(img_name)
+                        images.append(get_vector(img))
+                        progress_bar.update(1)  # update progress
+
+                # h5 file 생성
+                with h5py.File(os.path.join(s_dir, video + '.h5'), 'w') as hf:
+                    result = torch.stack(images)
+                    hf.create_dataset('pool5', data=result)
+                    hf.close()
+                    print("h5 file 생성 완료", "result:", result.shape)

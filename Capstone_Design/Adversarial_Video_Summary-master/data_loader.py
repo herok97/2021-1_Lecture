@@ -11,7 +11,7 @@ import numpy as np
 
 
 class VideoData(Dataset):
-    def __init__(self, root, preprocessed=False, transform=resnet_transform, with_name=False):
+    def __init__(self, root, preprocessed=True, transform=resnet_transform, with_name=False):
         self.root = root
         self.preprocessed = preprocessed
         self.transform = transform
@@ -26,7 +26,8 @@ class VideoData(Dataset):
             image_path = self.video_list[index]
             with h5py.File(image_path, 'r') as f:
                 if self.with_name:
-                    return torch.Tensor(np.array(f['pool5'])), image_path.name[:-5]
+                    # return torch.Tensor(np.array(f['pool5'])), image_path.name[:-5]
+                    return torch.Tensor(np.array(f['pool5'])), image_path.name[:]
                 else:
                     return torch.Tensor(np.array(f['pool5']))
 

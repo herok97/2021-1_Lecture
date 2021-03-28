@@ -7,7 +7,6 @@ root_dir = Path(root)
 
 sub_dirs = [sub_dir for sub_dir in root_dir.iterdir() if sub_dir.is_dir]
 file_count = 0
-
 for sub_dir in sub_dirs:
     videos = [video for video in sub_dir.iterdir() if not video.is_dir()]
     for video in videos:
