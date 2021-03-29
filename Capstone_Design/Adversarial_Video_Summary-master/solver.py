@@ -62,7 +62,7 @@ class Solver(object):
             #     print('\t' + name + '\t', list(param.size()))
 
             # Tensorboard 주석처리 내가 했음
-            # self.writer = TensorboardWriter(self.config.log_dir)
+            self.writer = TensorboardWriter(self.config.log_dir)
 
     @staticmethod
     def freeze_model(module):
@@ -92,6 +92,17 @@ class Solver(object):
         return gan_loss
 
     def train(self):
+        # GPU 정보
+        USE_CUDA = torch.cuda.is_available()
+        print(USE_CUDA)
+        device = torch.device('cuda:0' if USE_CUDA else 'cpu')
+        print('학습을 진행하는 기기:', device)
+        print('cuda index:', torch.cuda.current_device())
+        print('gpu 개수:', torch.cuda.device_count())
+        print('graphic name:', torch.cuda.get_device_name())
+        cuda = torch.device('cuda')
+        print(cuda)
+
         step = 0
         for epoch_i in trange(self.config.n_epochs, desc='Epoch', ncols=80):
             s_e_loss_history = []
@@ -113,8 +124,6 @@ class Solver(object):
                 # [seq_len, 2048]
                 image_features_ = Variable(image_features).cuda()
 
-                # 내가 작성한 코드
-                del image_features
 
                 #---- Train sLSTM, eLSTM ----#
                 if self.config.verbose:
@@ -122,7 +131,6 @@ class Solver(object):
 
                 # [seq_len, 1, hidden_size]
                 original_features = self.linear_compress(image_features_.detach()).unsqueeze(1)
-
                 scores, h_mu, h_log_variance, generated_features = self.summarizer(
                     original_features)
                 _, _, _, uniform_features = self.summarizer(
@@ -147,15 +155,16 @@ class Solver(object):
                     f'recon loss {reconstruction_loss.data:.3f}, prior loss: {prior_loss.data:.3f}, sparsity loss: {sparsity_loss.data:.3f}')
 
                 s_e_loss = reconstruction_loss + prior_loss + sparsity_loss
+                print("type(s_e_loss", type(s_e_loss))
+                print("s_e_loss.shape", s_e_loss.shape)
 
                 self.s_e_optimizer.zero_grad()
 
-                print("                s_e_loss.backward()  # retain_graph=True)")
                 s_e_loss.backward()  # retain_graph=True)
                 # Gradient cliping
+                print("######################################")
                 torch.nn.utils.clip_grad_norm(self.model.parameters(), self.config.clip)
                 self.s_e_optimizer.step()
-                print("                self.s_e_optimizer.step()")
 
                 s_e_loss_history.append(s_e_loss.data)
 

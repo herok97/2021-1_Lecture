@@ -71,9 +71,7 @@ if __name__ == "__main__":
     USE_CUDA = torch.cuda.is_available()
     print(USE_CUDA)
     device = torch.device('cuda:0' if USE_CUDA else 'cpu')
-    print('학습을 진행하는 기기:', device)
-    print('cuda index:', torch.cuda.current_device())
-    print('gpu 개수:', torch.cuda.device_count())
+    print('기기:', device)
     print('graphic name:', torch.cuda.get_device_name())
     cuda = torch.device('cuda')
     print(cuda)
@@ -117,6 +115,10 @@ if __name__ == "__main__":
             # 한 영상에 대한 이미지에 대해서
 
             for video in video_list:
+
+                # 이미 h5파일 만들었으면 건너 뜀
+                if os.path.isfile(os.path.join(s_dir, video + '.h5')):
+                    continue
 
                 # 이미지 폴더 접근
                 folder = os.path.join(r_dir, video)
