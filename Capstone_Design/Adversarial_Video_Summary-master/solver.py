@@ -21,19 +21,41 @@ class Solver(object):
         self.test_loader = test_loader
 
     def build(self):
+        # 내가 추가한 코드
+        # torch.backends.cudnn.enabled = True
+
+        # 내가 추가한 코드 / GPU 정보
+        USE_CUDA = torch.cuda.is_available()
+        print(USE_CUDA)
+        device = torch.device('cuda:0' if USE_CUDA else 'cpu')
+        print('학습을 진행하는 기기:', device)
+        print('cuda index:', torch.cuda.current_device())
+        print('gpu 개수:', torch.cuda.device_count())
+        print('graphic name:', torch.cuda.get_device_name())
+        # setting device on GPU if available, else CPU
+        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        print('Using device:', device)
+        print()
+
+        # Additional Info when using cuda
+        if device.type == 'cuda':
+            print(torch.cuda.get_device_name(0))
+            print('Memory Usage:')
+            print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
+            print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
         # Build Modules
         self.linear_compress = nn.Linear(
             self.config.input_size,
-            self.config.hidden_size).cuda()
+            self.config.hidden_size).cuda(device)
         self.summarizer = Summarizer(
             input_size=self.config.hidden_size,
             hidden_size=self.config.hidden_size,
-            num_layers=self.config.num_layers).cuda()
+            num_layers=self.config.num_layers).cuda(device)
         self.discriminator = Discriminator(
             input_size=self.config.hidden_size,
             hidden_size=self.config.hidden_size,
-            num_layers=self.config.num_layers).cuda()
+            num_layers=self.config.num_layers).cuda(device)
         self.model = nn.ModuleList([
             self.linear_compress, self.summarizer, self.discriminator])
 
@@ -92,16 +114,6 @@ class Solver(object):
         return gan_loss
 
     def train(self):
-        # GPU 정보
-        USE_CUDA = torch.cuda.is_available()
-        print(USE_CUDA)
-        device = torch.device('cuda:0' if USE_CUDA else 'cpu')
-        print('학습을 진행하는 기기:', device)
-        print('cuda index:', torch.cuda.current_device())
-        print('gpu 개수:', torch.cuda.device_count())
-        print('graphic name:', torch.cuda.get_device_name())
-        cuda = torch.device('cuda')
-        print(cuda)
 
         step = 0
         for epoch_i in trange(self.config.n_epochs, desc='Epoch', ncols=80):
@@ -112,8 +124,6 @@ class Solver(object):
                     self.train_loader, desc='Batch', ncols=80, leave=False)):
 
                 image_features = image_features[0]
-                print("image_features.shape", image_features.shape)
-                print("image_features.size(1)", image_features.size(1))
                 if image_features.size(1) > 10000:
                     continue
 
@@ -131,6 +141,7 @@ class Solver(object):
 
                 # [seq_len, 1, hidden_size]
                 original_features = self.linear_compress(image_features_.detach()).unsqueeze(1)
+
                 scores, h_mu, h_log_variance, generated_features = self.summarizer(
                     original_features)
                 _, _, _, uniform_features = self.summarizer(
@@ -155,14 +166,11 @@ class Solver(object):
                     f'recon loss {reconstruction_loss.data:.3f}, prior loss: {prior_loss.data:.3f}, sparsity loss: {sparsity_loss.data:.3f}')
 
                 s_e_loss = reconstruction_loss + prior_loss + sparsity_loss
-                print("type(s_e_loss", type(s_e_loss))
-                print("s_e_loss.shape", s_e_loss.shape)
 
                 self.s_e_optimizer.zero_grad()
 
                 s_e_loss.backward()  # retain_graph=True)
                 # Gradient cliping
-                print("######################################")
                 torch.nn.utils.clip_grad_norm(self.model.parameters(), self.config.clip)
                 self.s_e_optimizer.step()
 
@@ -311,7 +319,8 @@ class Solver(object):
             with open(score_save_path, 'w') as f:
                 tqdm.write(f'Saving score at {str(score_save_path)}.')
                 json.dump(out_dict, f)
-            score_save_path.chmod(0o777)
+            # 내가 수정한 코드
+            # score_save_path.chmod(0o777)
 
     def pretrain(self):
         pass

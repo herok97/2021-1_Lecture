@@ -1,11 +1,12 @@
 # -*- coding: utf-8 -*-
 import h5py
 from PIL import Image
+from torch.backends import cudnn
 from torchvision import transforms, models, datasets
 import torch.nn as nn
 import torch
 from tqdm import tqdm
-
+from time import sleep
 class Rescale(object):
     """Rescale a image to a given size.
 
@@ -61,11 +62,9 @@ resnet_transform = transforms.Compose([
     ])
 
 if __name__ == "__main__":
+    cudnn.benchmark = True
     from PIL import Image
     from torchvision.datasets.folder import default_loader
-
-    model = ResNetFeature()
-    layer = model._modules.get('pool5')
 
     # GPU 정보
     USE_CUDA = torch.cuda.is_available()
@@ -74,7 +73,11 @@ if __name__ == "__main__":
     print('기기:', device)
     print('graphic name:', torch.cuda.get_device_name())
     cuda = torch.device('cuda')
-    print(cuda)
+
+    model = ResNetFeature()
+    layer = model._modules.get('pool5')
+
+
 
     def get_vector(image):
         # Create a PyTorch tensor with the transformed image
@@ -133,6 +136,7 @@ if __name__ == "__main__":
                         img = default_loader(img_name)
                         images.append(get_vector(img))
                         progress_bar.update(1)  # update progress
+                        sleep(0.1)
 
                 # h5 file 생성
                 with h5py.File(os.path.join(s_dir, video + '.h5'), 'w') as hf:
