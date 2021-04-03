@@ -22,7 +22,7 @@ class Solver(object):
 
     def build(self):
         # 내가 추가한 코드
-        # torch.backends.cudnn.enabled = True
+        torch.backends.cudnn.enabled = False
 
         # 내가 추가한 코드 / GPU 정보
         USE_CUDA = torch.cuda.is_available()
@@ -33,29 +33,20 @@ class Solver(object):
         print('gpu 개수:', torch.cuda.device_count())
         print('graphic name:', torch.cuda.get_device_name())
         # setting device on GPU if available, else CPU
-        device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         print('Using device:', device)
-        print()
-
-        # Additional Info when using cuda
-        if device.type == 'cuda':
-            print(torch.cuda.get_device_name(0))
-            print('Memory Usage:')
-            print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
-            print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
 
         # Build Modules
         self.linear_compress = nn.Linear(
             self.config.input_size,
-            self.config.hidden_size).cuda(device)
+            self.config.hidden_size).cuda()
         self.summarizer = Summarizer(
             input_size=self.config.hidden_size,
             hidden_size=self.config.hidden_size,
-            num_layers=self.config.num_layers).cuda(device)
+            num_layers=self.config.num_layers).cuda()
         self.discriminator = Discriminator(
             input_size=self.config.hidden_size,
             hidden_size=self.config.hidden_size,
-            num_layers=self.config.num_layers).cuda(device)
+            num_layers=self.config.num_layers).cuda()
         self.model = nn.ModuleList([
             self.linear_compress, self.summarizer, self.discriminator])
 
@@ -123,6 +114,15 @@ class Solver(object):
             for batch_i, image_features in enumerate(tqdm(
                     self.train_loader, desc='Batch', ncols=80, leave=False)):
 
+                # 내가 추가한 코드 / cache release
+                torch.cuda.empty_cache()
+                print('Memory Usage:')
+                print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
+                print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
+
+                # 내가 추가한 코드 / memory use 보여줌
+                # print("torch.cuda.list_gpu_processes()", torch.cuda.list_gpu_processes())
+
                 image_features = image_features[0]
                 if image_features.size(1) > 10000:
                     continue
@@ -139,14 +139,20 @@ class Solver(object):
                 if self.config.verbose:
                     tqdm.write('\nTraining sLSTM and eLSTM...')
 
+                # 내가 쓴 주석
+                # 기존 Tensor에서 gradient 전파가 안되는 텐서 생성, 단 storage를 공유하기에 detach로 생성한
+                # Tensor가 변경되면 원본 Tensor도 똑같이 변한다.
                 # [seq_len, 1, hidden_size]
                 original_features = self.linear_compress(image_features_.detach()).unsqueeze(1)
 
                 scores, h_mu, h_log_variance, generated_features = self.summarizer(
                     original_features)
+
+                # 내가 수정한 곳
                 _, _, _, uniform_features = self.summarizer(
                     original_features, uniform=True)
 
+                # 내가 수정한 곳
                 h_origin, original_prob = self.discriminator(original_features)
                 h_fake, fake_prob = self.discriminator(generated_features)
                 h_uniform, uniform_prob = self.discriminator(uniform_features)
@@ -157,6 +163,7 @@ class Solver(object):
                     f'original_p: {original_prob.data:.3f}, fake_p: {fake_prob.data:.3f}, uniform_p: {uniform_prob.data:.3f}')
 
                 reconstruction_loss = self.reconstruction_loss(h_origin, h_fake)
+
                 prior_loss = self.prior_loss(h_mu, h_log_variance)
                 sparsity_loss = self.sparsity_loss(scores)
 
@@ -170,6 +177,7 @@ class Solver(object):
                 self.s_e_optimizer.zero_grad()
 
                 s_e_loss.backward()  # retain_graph=True)
+
                 # Gradient cliping
                 torch.nn.utils.clip_grad_norm(self.model.parameters(), self.config.clip)
                 self.s_e_optimizer.step()
@@ -180,6 +188,7 @@ class Solver(object):
                 if self.config.verbose:
                     tqdm.write('Training dLSTM...')
 
+                # 내가 주석 단 곳 / original_features 한 번 더 안가져오면 freed 오류 뜸
                 # [seq_len, 1, hidden_size]
                 original_features = self.linear_compress(image_features_.detach()).unsqueeze(1)
 
@@ -198,6 +207,7 @@ class Solver(object):
                     f'original_p: {original_prob.data:.3f}, fake_p: {fake_prob.data:.3f}, uniform_p: {uniform_prob.data:.3f}')
 
                 reconstruction_loss = self.reconstruction_loss(h_origin, h_fake)
+
                 gan_loss = self.gan_loss(original_prob, fake_prob, uniform_prob)
 
                 tqdm.write(
@@ -208,7 +218,12 @@ class Solver(object):
                 d_loss = reconstruction_loss + gan_loss
 
                 self.d_optimizer.zero_grad()
+
+                # 내가 수정한 코드 / 오류떴음
                 d_loss.backward()  # retain_graph=True)
+
+
+
                 # Gradient cliping
                 torch.nn.utils.clip_grad_norm(self.model.parameters(), self.config.clip)
                 self.d_optimizer.step()
@@ -220,7 +235,7 @@ class Solver(object):
                     if self.config.verbose:
                         tqdm.write('Training cLSTM...')
                     # [seq_len, 1, hidden_size]
-                    original_features = self.linear_compress(image_features_.detach()).unsqueeze(1)
+                    # original_features = self.linear_compress(image_features_.detach()).unsqueeze(1)
 
                     scores, h_mu, h_log_variance, generated_features = self.summarizer(
                         original_features)
@@ -253,14 +268,20 @@ class Solver(object):
                 if self.config.verbose:
                     tqdm.write('Plotting...')
 
+
+
+                # 내가 쓴 주석 / 텐서보드 코드
                 self.writer.update_loss(reconstruction_loss.data, step, 'recon_loss')
                 self.writer.update_loss(prior_loss.data, step, 'prior_loss')
                 self.writer.update_loss(sparsity_loss.data, step, 'sparsity_loss')
                 self.writer.update_loss(gan_loss.data, step, 'gan_loss')
 
-                # self.writer.update_loss(s_e_loss.data, step, 's_e_loss')
-                # self.writer.update_loss(d_loss.data, step, 'd_loss')
-                # self.writer.update_loss(c_loss.data, step, 'c_loss')
+                self.writer.update_loss(s_e_loss.data, step, 's_e_loss')
+                self.writer.update_loss(d_loss.data, step, 'd_loss')
+
+                # 내가 수정한 코드 / c_loss 는 15 이상부터 생김
+                if batch_i > self.config.discriminator_slow_start:
+                    self.writer.update_loss(c_loss.data, step, 'c_loss')
 
                 self.writer.update_loss(original_prob.data, step, 'original_prob')
                 self.writer.update_loss(fake_prob.data, step, 'fake_prob')

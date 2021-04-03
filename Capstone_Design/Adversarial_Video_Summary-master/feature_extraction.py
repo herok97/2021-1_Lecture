@@ -61,6 +61,27 @@ resnet_transform = transforms.Compose([
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
 
+
+def get_vector(image):
+    # Create a PyTorch tensor with the transformed image
+    t_img = resnet_transform(image)
+    # Create a vector of zeros that will hold our feature vector
+    my_embedding = torch.zeros(2048)
+
+    # Define a function that will copy the output of a layer
+    def copy_data(m, i, o):
+        my_embedding.copy_(o.flatten())  # <-- flatten
+
+    # Attach that function to our selected layer
+    h = layer.register_forward_hook(copy_data)
+    # Run the model on our transformed image
+    with torch.no_grad():  # <-- no_grad context
+        model(t_img.cuda().unsqueeze(0))  # <-- unsqueeze
+    # Detach our copy function from the layer
+    h.remove()
+    # Return the feature vector
+    return my_embedding
+
 if __name__ == "__main__":
     cudnn.benchmark = True
     from PIL import Image
@@ -72,33 +93,9 @@ if __name__ == "__main__":
     device = torch.device('cuda:0' if USE_CUDA else 'cpu')
     print('기기:', device)
     print('graphic name:', torch.cuda.get_device_name())
-    cuda = torch.device('cuda')
 
     model = ResNetFeature()
     layer = model._modules.get('pool5')
-
-
-
-    def get_vector(image):
-        # Create a PyTorch tensor with the transformed image
-        t_img = resnet_transform(image)
-        # Create a vector of zeros that will hold our feature vector
-        # The 'avgpool' layer has an output size of 512
-        my_embedding = torch.zeros(2048)
-
-        # Define a function that will copy the output of a layer
-        def copy_data(m, i, o):
-            my_embedding.copy_(o.flatten())  # <-- flatten
-
-        # Attach that function to our selected layer
-        h = layer.register_forward_hook(copy_data)
-        # Run the model on our transformed image
-        with torch.no_grad():  # <-- no_grad context
-            model(t_img.cuda().unsqueeze(0))  # <-- unsqueeze
-        # Detach our copy function from the layer
-        h.remove()
-        # Return the feature vector
-        return my_embedding
 
     import os
     root_dir = "C:/Users/01079/video_summarization_data/only_video/"
@@ -113,7 +110,7 @@ if __name__ == "__main__":
         for t in tt:
             r_dir = root_dir + '/' + cate + '/' + t + '/'
             s_dir = save_dir + '/' + cate + '/' + t + '/'
-
+            print(r_dir)
             video_list = os.listdir(r_dir)
             # 한 영상에 대한 이미지에 대해서
 
@@ -136,7 +133,6 @@ if __name__ == "__main__":
                         img = default_loader(img_name)
                         images.append(get_vector(img))
                         progress_bar.update(1)  # update progress
-                        sleep(0.1)
 
                 # h5 file 생성
                 with h5py.File(os.path.join(s_dir, video + '.h5'), 'w') as hf:
@@ -144,3 +140,6 @@ if __name__ == "__main__":
                     hf.create_dataset('pool5', data=result)
                     hf.close()
                     print("h5 file 생성 완료", "result:", result.shape)
+                
+                # 캐시 메모리 해제
+                torch.cuda.empty_cache()
