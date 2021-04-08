@@ -18,11 +18,12 @@ def tree(key, r, i, j):
         p.r_child = tree(key, r, k + 1, j)
         return p
 
-
-key = [" ", "A", "B", "C", "D"]
-p = [0, 0.375, 0.375, 0.125, 0.125]
+# 데이터 입력
+key = [" ", "A", "B", "C", "D", "E"]
+p = [0, 4/15, 5/15, 1/15, 3/15, 2/15]
 n = len(p) - 1
 
+# a와 r의 초기값 설정
 a = [[0 for j in range(0, n + 2)] for i in range(0, n + 2)]
 r = [[0 for j in range(0, n + 2)] for i in range(0, n + 2)]
 
@@ -48,6 +49,7 @@ for diagonal in range(1, n):
         a[i][j] = tmp + sum(p[i:j+1])
         r[i][j] = k_
 
+# 결과 출력
 utility.printMatrixF(a)
 print()
 utility.printMatrix(r)
