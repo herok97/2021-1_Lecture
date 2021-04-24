@@ -121,11 +121,11 @@ y = 0
 
 while (x < m and y < n):
     tx, ty = x, y
-    print(minindex[x][y])
+    print(minindex[x][y], end='\t')
     (x, y) = minindex[x][y]
     if x == tx + 1 and y == ty + 1:
         print(a[tx], " ", b[ty])
     elif x == tx and y == ty + 1:
-        print(" - ", " ", b[ty])
+        print("-", " ", b[ty])
     else:
-        print(a[tx], " ", " -")
+        print(a[tx], " ", "-")
