@@ -6,7 +6,7 @@ import pprint
 
 project_dir = Path(__file__).resolve().parent
 # dataset_dir = Path('C:/Users/01079/video_summarization_data/only_video/').resolve()
-dataset_dir = Path('C:/Users/01079/video_summarization_data/h5/').resolve()
+dataset_dir = Path('C:/Users/01079/video_summarization_data/h5_new/').resolve()
 video_list = ['OVP', 'SumMe', 'TvSum']
 save_dir = Path('./results/save/')
 score_dir = Path('./results/score/')
