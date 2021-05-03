@@ -74,14 +74,18 @@ class Solver(object):
                 list(self.discriminator.parameters())
                 + list(self.linear_compress.parameters()),
                 lr=self.config.discriminator_lr)
-
+            print(self.model)
             self.model.train()
             # self.model.apply(apply_weight_norm)
 
             # Overview Parameters
+            # VAE만 학습시키기
             # print('Model Parameters')
             # for name, param in self.model.named_parameters():
             #     print('\t' + name + '\t', list(param.size()))
+            #     if 'vae' not in name:
+            #         param.requires_grad = False
+            #     print('\t train: ' + '\t', param.requires_grad)
 
             # Tensorboard 주석처리 내가 했음
             self.writer = TensorboardWriter(self.config.log_dir)
@@ -123,31 +127,17 @@ class Solver(object):
             for batch_i, image_features in enumerate(tqdm(
                     self.train_loader, desc='Batch', ncols=80, leave=False)):
 
-                # 내가 추가한 코드 / 메모리 사용량 확인
-                memoryUse("배치 시작!")
-
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
-                print('Memory Usage:')
-                print('Allocated:', round(torch.cuda.memory_allocated(0) / 1024 ** 3, 1), 'GB')
-                print('Cached:   ', round(torch.cuda.memory_reserved(0) / 1024 ** 3, 1), 'GB')
-
-                # 내가 추가한 코드 / memory use 보여줌 / 안먹힘
-                # print("torch.cuda.list_gpu_processes()", torch.cuda.list_gpu_processes())
-
                 image_features = image_features[0]
                 if image_features.size(1) > 10000:
                     continue
                 # [batch_size=1, seq_len, 2048]
                 # [seq_len, 2048]
                 image_features = image_features.view(-1, self.config.input_size)
-                memoryUse("image_features.view(-1, self.config.input_size)")
 
                 # [seq_len, 2048]
                 # 내가 수정한 코드 Variable => Tensor
                 image_features_ = torch.FloatTensor(image_features).cuda()
                 # image_features_ = Variable(image_features).cuda()
-                memoryUse("torch.FloatTensor(image_features).cuda()")
 
                 #---- Train sLSTM, eLSTM ----#
                 if self.config.verbose:
@@ -158,22 +148,12 @@ class Solver(object):
                 # Tensor가 변경되면 원본 Tensor도 똑같이 변한다.
                 # [seq_len, 1, hidden_size]
                 original_features = self.linear_compress(image_features_.detach()).unsqueeze(1)
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
-                memoryUse("original_features 생성")
 
-                print("self.linear_compress(image_features_.detach()).unsqueeze(1)", original_features.shape)
                 scores, h_mu, h_log_variance, generated_features = self.summarizer(
                     original_features)
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
-                memoryUse("generated_features 생성")
 
                 _, _, _, uniform_features = self.summarizer(
                     original_features, uniform=True)
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
-                memoryUse("uniform_features 생성")
 
                 h_origin, original_prob = self.discriminator(original_features)
                 h_fake, fake_prob = self.discriminator(generated_features)
@@ -197,15 +177,9 @@ class Solver(object):
                 s_e_loss = reconstruction_loss + prior_loss + sparsity_loss
 
                 self.s_e_optimizer.zero_grad()
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
-                memoryUse("s_e_loss.backward()")
                 s_e_loss.backward()  # retain_graph=True)
 
                 # Gradient cliping
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
-                memoryUse("Gradient cliping")
                 torch.nn.utils.clip_grad_norm(self.model.parameters(), self.config.clip)
                 self.s_e_optimizer.step()
 
@@ -219,21 +193,12 @@ class Solver(object):
                 # [seq_len, 1, hidden_size]
 
                 original_features = self.linear_compress(image_features_.detach()).unsqueeze(1)
-                memoryUse("original_features 다시 가져오기")
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
 
                 scores, h_mu, h_log_variance, generated_features = self.summarizer(
                     original_features)
-                memoryUse("generated_features 다시 가져오기")
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
 
                 _, _, _, uniform_features = self.summarizer(
                     original_features, uniform=True)
-                memoryUse("uniform_features 다시 가져오기")
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
 
                 h_origin, original_prob = self.discriminator(original_features)
                 h_fake, fake_prob = self.discriminator(generated_features)
@@ -247,9 +212,6 @@ class Solver(object):
                 reconstruction_loss = self.reconstruction_loss(h_origin, h_fake)
 
                 gan_loss = self.gan_loss(original_prob, fake_prob, uniform_prob)
-                memoryUse("gan_loss")
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
 
                 tqdm.write(
                     # 내가 수정한 곳
@@ -257,22 +219,11 @@ class Solver(object):
                     f'recon loss {reconstruction_loss.data:.3f}, gan loss: {gan_loss.data:.3f}')
 
                 d_loss = reconstruction_loss + gan_loss
-                memoryUse("d_loss")
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
 
                 self.d_optimizer.zero_grad()
 
                 # 내가 수정한 코드 / 오류떴음
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
                 d_loss.backward()  # retain_graph=True)
-
-                memoryUse("d_loss.backward")
-                # 내가 추가한 코드 / cache release
-                torch.cuda.empty_cache()
-
-
 
                 # Gradient cliping
                 torch.nn.utils.clip_grad_norm(self.model.parameters(), self.config.clip)
@@ -282,9 +233,7 @@ class Solver(object):
 
                 #---- Train cLSTM ----#
                 if batch_i > self.config.discriminator_slow_start:
-                    memoryUse("discriminator 시작")
-                    # 내가 추가한 코드 / cache release
-                    torch.cuda.empty_cache()
+
                     if self.config.verbose:
                         tqdm.write('Training cLSTM...')
                     # [seq_len, 1, hidden_size]
@@ -304,9 +253,6 @@ class Solver(object):
                         f'original_p: {original_prob.data:.3f}, fake_p: {fake_prob.data:.3f}, uniform_p: {uniform_prob.data:.3f}')
 
                     # Maximization
-                    memoryUse("Maximization 시작")
-                    # 내가 추가한 코드 / cache release
-                    torch.cuda.empty_cache()
                     c_loss = -1 * self.gan_loss(original_prob, fake_prob, uniform_prob)
 
                     # 내가 수정한 곳

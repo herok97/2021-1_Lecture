@@ -98,8 +98,8 @@ if __name__ == "__main__":
     layer = model._modules.get('pool5')
 
     import os
-    root_dir = "C:/Users/01079/video_summarization_data/only_video/"
-    save_dir = "C:/Users/01079/video_summarization_data/h5/"
+    root_dir = "C:/Users/01079/video_summarization_data/only_video02/"
+    save_dir = "C:/Users/01079/video_summarization_data/h5_02/"
 
     category = ['OVP', 'SumMe', 'TvSum']
     tt = ['train', 'test']
@@ -130,7 +130,11 @@ if __name__ == "__main__":
 
                 with tqdm(total=len(img_names)) as progress_bar:
                     for img_name in img_names:
-                        img = default_loader(img_name)
+                        try:
+                            img = default_loader(img_name)
+                        except:
+                            print("Wrong file fomrat, perhaps it was 0 bytes image file")
+                            print("i'm gonna duplicate previous image")
                         images.append(get_vector(img))
                         progress_bar.update(1)  # update progress
 
